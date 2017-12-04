@@ -21,6 +21,11 @@ from .common import (
 )
 
 
+import cProfile
+import pstats
+import io
+
+
 __all__ = (
     "Permission",
     "User",
@@ -1156,11 +1161,24 @@ class Server(AbstractServer):
         async def list_worker(self, connection, rest):
             stream = connection.data_connection
             del connection.data_connection
+
+            pr = cProfile.Profile()
+            pr.enable()
+
             async with stream:
                 async for path in connection.path_io.list(real_path):
                     s = await self.build_list_string(connection, path)
                     b = (s + END_OF_LINE).encode(encoding=self.encoding)
                     await stream.write(b)
+
+            pr.disable()
+            with open('/tmp/y.txt', 'a') as fout:
+                fout.write('<list {}>\n'.format(real_path))
+                sortby = 'cumulative'
+                ps = pstats.Stats(pr, stream=fout).sort_stats(sortby)
+                ps.print_stats()
+                fout.write('</list {}>\n'.format(real_path))
+
             connection.response("226", "list transfer done")
             return True
 
